@@ -6,11 +6,8 @@ import time
 # Defina o nome da pasta de saída
 output_base_folder = 'Servidores'
 
-# Tempo limite de 5000 segundos (cerca de 83 minutos) por servidor
-server_timeout_seconds = 3600
-
 # Tempo mínimo entre solicitações para respeitar o limite de taxa do Discord (5 solicitações por segundo)
-rate_limit_wait_time = 0
+rate_limit_wait_time = 0.2
 
 def get(url, headers, params):
     return requests.get(url, headers=headers, params=params)
@@ -44,10 +41,11 @@ def fetch_messages(channel_id, channel_name, server_name, headers):
                 for message in messages_json:
                     if 'content' in message and message['content'].strip() != '':
                         username = message['author']['username']
+                        user_id = message['author']['id']  # Obtenha o user_id
                         content = message['content']
                         alo = message['timestamp']
-                        message_str = f'{alo},{username},{content}\n'
-                        
+                        message_str = f'{alo},{user_id},{username},{content}\n'
+                        print(message_str)
                         file.write(message_str)
                         messages_written = True
 
@@ -58,20 +56,13 @@ def fetch_messages(channel_id, channel_name, server_name, headers):
         else:
             print(f"Erro ao recuperar mensagens do canal {channel_name}. Código de status: {message_request.status_code}")
             break
-
-        # Verifique o tempo limite por servidor
-        elapsed_time = time.time() - start_time
-        if elapsed_time >= server_timeout_seconds:
-            print(f"Limite de tempo atingido para o servidor {server_name}.")
-            break
-
+       
         # Respeite o limite de taxa do Discord
         time.sleep(rate_limit_wait_time)
 
     # Verifique se o arquivo existe antes de tentar removê-lo
     if os.path.exists(output_file) and not messages_written:
         os.remove(output_file)
-
 def process_server(server_info, headers):
     if len(server_info) != 2:
         print(f"Formato inválido na linha do arquivo 'servers.txt': {server_info}")
