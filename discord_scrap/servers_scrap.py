@@ -36,7 +36,7 @@ for div in server_divs:
             contador += 1
 
 # Escreva os servidores em um arquivo CSV com dois parâmetros
-with open(f'servidorespagina{pagina}.csv', 'w', newline='', encoding='utf-8') as csvfile:
+with open(f'servidorespagina{pagina}.txt', 'w', newline='', encoding='utf-8') as csvfile:
     csvwriter = csv.writer(csvfile)
     # csvwriter.writerow(['Nome do servidor', 'ID do servidor'])
     for servidor in servidores:
