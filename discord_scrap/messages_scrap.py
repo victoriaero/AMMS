@@ -1,19 +1,70 @@
-import json
+import logging
 import os
 import requests
+import sys
 import time
 
-# Defina o nome da pasta de saída
-output_base_folder = 'Servidores'
+# Constants and Configuration
+AUTHORIZATION_TOKEN = 'MTE2NDM5NDU1OTI1MDM2NjU4NQ.GODq5W.0SoUQch0CvOlzR7KxOJWvIpI9mX48t0kxoR8Cc'
+OUTPUT_BASE_FOLDER = 'data'
+RATE_LIMIT_WAIT_TIME = 0
 
-# Tempo mínimo entre solicitações para respeitar o limite de taxa do Discord (5 solicitações por segundo)
-rate_limit_wait_time = 0.2
+#create a mined_servers.txt file if it doesn't exist
+if not os.path.exists('files/mined_servers.txt'):
+    if not os.path.exists('files'):
+        os.makedirs('files')
+    else: 
+        open('files/mined_servers.txt', 'w', encoding='utf-8').close()
 
-def get(url, headers, params):
-    return requests.get(url, headers=headers, params=params)
+# Create a logs directory if it doesn't exist
+if not os.path.exists('logs'):
+    os.makedirs('logs')
 
-def fetch_messages(channel_id, channel_name, server_name, headers):
-    output_folder = os.path.join(output_base_folder, server_name)
+# Create a logger for error messages
+error_logger = logging.getLogger('error_logger')
+error_logger.setLevel(logging.ERROR)
+error_handler = logging.FileHandler('logs/errors.log', mode='w', encoding='utf-8')
+error_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+error_handler.setFormatter(error_formatter)
+error_logger.addHandler(error_handler)
+
+# Create a logger for info messages
+info_logger = logging.getLogger('info_logger')
+info_logger.setLevel(logging.INFO)
+info_handler = logging.FileHandler('logs/info.log', mode='w', encoding='utf-8')
+info_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+info_handler.setFormatter(info_formatter)
+info_logger.addHandler(info_handler)
+
+# Function to make an API request
+def make_request(url, headers, params):
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()  # Raise an exception for bad responses
+    return response.json()
+
+# Function to write the server information to a file
+def write_mined_server(server_info):
+    server_line = f"{server_info[0]},{server_info[1]}\n"
+
+    with open('files/mined_servers.txt', 'a', encoding='utf-8') as mined_servers_file:
+        mined_servers_file.write(server_line)
+
+# Function to retrieve text channels for a server
+def retrieve_text_channels(server_id, server_name, headers):
+    try:
+        response = make_request(f'https://discord.com/api/v9/guilds/{server_id}/channels', headers=headers, params={})
+
+        if isinstance(response, list):
+            text_channels = [channel for channel in response if channel.get('type', 0) == 0 and not channel.get('private', False)]
+            return text_channels
+
+    except requests.exceptions.HTTPError as e:
+        error_logger.error(f"Erro ao recuperar canais. Response: {e.response}. Status code: {e.response.status_code}. Servidor: {server_name}. ID: {server_id}.")
+        return []
+
+# Function to fetch and save messages from a channel
+def fetch_channel_messages(channel_id, channel_name, server_name, headers):
+    output_folder = os.path.join(OUTPUT_BASE_FOLDER, server_name)
     os.makedirs(output_folder, exist_ok=True)
 
     output_file = os.path.join(output_folder, f'{channel_name}.txt')
@@ -21,7 +72,6 @@ def fetch_messages(channel_id, channel_name, server_name, headers):
     limit = 100
     before = None
     messages_written = False
-    start_time = time.time()
 
     while True:
         params = {
@@ -29,83 +79,109 @@ def fetch_messages(channel_id, channel_name, server_name, headers):
             'before': before
         }
 
-        message_request = get(f'https://discord.com/api/v9/channels/{channel_id}/messages', headers=headers, params=params)
-
-        if message_request.status_code == 200:
-            messages_json = json.loads(message_request.text)
-
+        try:
+            messages_json = make_request(f'https://discord.com/api/v9/channels/{channel_id}/messages', headers=headers, params=params)
             if not messages_json:
+                error_logger.error(f"Erro ao recuperar mensagens do canal. Response: {e.response}. Status: {e.response.status_code}. Servidor: {server_name}. Canal: {channel_name}.")
                 break
 
             with open(output_file, 'a', encoding='utf-8') as file:
                 for message in messages_json:
                     if 'content' in message and message['content'].strip() != '':
                         username = message['author']['username']
-                        user_id = message['author']['id']  # Obtenha o user_id
+                        user_id = message['author']['id']
                         content = message['content']
-                        alo = message['timestamp']
-                        message_str = f'{alo},{user_id},{username},{content} $#fim#$\n'
-                        print(message_str)
+                        timestamp = message['timestamp']
+
+                        message_str = f'{timestamp},{user_id},{username},{content}\n'
+
+                        # print(message_str)
                         file.write(message_str)
+
                         messages_written = True
 
-            before = messages_json[-1]['id']
-        elif message_request.status_code == 403:
-            print(f"Sem acesso ao canal {channel_name}.")
-            break
-        else:
-            print(f"Erro ao recuperar mensagens do canal {channel_name}. Código de status: {message_request.status_code}")
-            break
-       
-        # Respeite o limite de taxa do Discord
-        time.sleep(rate_limit_wait_time)
+                before = messages_json[-1]['id']
 
-    # Verifique se o arquivo existe antes de tentar removê-lo
+        except requests.exceptions.HTTPError as e:
+            error_logger.error(f"Erro ao recuperar mensagens do canal. Response: {e.response}. Status: {e.response.status_code}. Servidor: {server_name}. Canal: {channel_name}.")
+            return
+
+        # Respect the Discord rate limit
+        time.sleep(RATE_LIMIT_WAIT_TIME)
+
+    # Check if the file exists before attempting to remove it
     if os.path.exists(output_file) and not messages_written:
         os.remove(output_file)
-def process_server(server_info, headers):
+
+    info_logger.info(f"Mensagens recuperadas com sucesso. Servidor: {server_name}. Canal: {channel_name}.")
+
+# Function to process server information
+def process_server_info(server_info, headers):
     if len(server_info) != 2:
-        print(f"Formato inválido na linha do arquivo 'servers.txt': {server_info}")
+        error_logger.error(f"Formato inválido na linha do arquivo 'servers.txt': {server_info}")
         return
 
     server_name, server_id = server_info
 
-    text_channels = retrieve_text_channels(server_id, headers)
+    text_channels = retrieve_text_channels(server_id, server_name, headers)
 
     if not text_channels:
-        print(f"Não foi possível acessar os canais do servidor {server_id}.")
+        error_logger.error(f"Não foi possível acessar os canais do servidor. Servidor: {server_name}. ID: {server_id}.")
         return
 
     for channel in text_channels:
         channel_name = channel['name']
         channel_id = channel['id']
 
-        # Verificar se o canal é de texto (não é de voz, não é privado)
+        # Check if the channel is a text channel (not a voice channel, not private)
         if 'private' in channel or channel['type'] != 0:
             continue
 
-        fetch_messages(channel_id, channel_name, server_name.strip(), headers)
+        fetch_channel_messages(channel_id, channel_name, server_name.strip(), headers)
 
-def retrieve_text_channels(server_id, headers):
-    response = requests.get(f'https://discord.com/api/v9/guilds/{server_id}/channels', headers=headers)
-    if response.status_code == 200:
-        channels_json = json.loads(response.text)
-        text_channels = [channel for channel in channels_json if channel['type'] == 0 and not channel.get('private', False)]
-        return text_channels
-    else:
-        print(f"Erro ao recuperar canais do servidor {server_id}. Código de status: {response.status_code}")
-        return []
+    info_logger.info(f"Servidor minerado com sucesso. Servidor: {server_name}. ID: {server_id}.")
+    write_mined_server(server_info)
 
-# Token de autenticação
-headers = {
-    'authorization': ''
-}
+# Main function
+def main():
+    # Token of authentication
+    headers = {
+        'authorization': AUTHORIZATION_TOKEN
+    }
 
-# Ler a lista de servidores e seus IDs do arquivo 'servers.txt'
-with open('servers.txt', 'r', encoding='utf-8') as servers_file:
-    servers = [line.strip().split(",") for line in servers_file]
+    try:
+        for i in range(25, 32):
+            filename = f'files/servidorespagina{i}.txt'
 
-for server_info in servers:
-    process_server(server_info, headers)
+            if not os.path.exists(filename):
+                error_logger.error(f"Arquivo não encontrado: {filename}.")
+                continue
 
-print("Mineração de todos os servidores concluída.")
+            with open(filename, 'r', encoding='utf-8') as servers_file:
+                servers = [line.strip().split(",") for line in servers_file]
+
+            for server_info in servers:
+                if server_info not in [line.strip().split(",") for line in open('files/mined_servers.txt', 'r', encoding='utf-8')]:
+                    process_server_info(server_info, headers)
+                else:
+                    server_name, server_id = server_info
+                    info_logger.info(f"Servidor já minerado. Pulando. Servidor: {server_name}. ID: {server_id}.")
+
+        info_logger.info("Programa finalizado com sucesso.")
+        print("Programa finalizado com sucesso.")
+
+    except KeyboardInterrupt:
+        error_logger.error("Programa interrompido pelo usuário.")
+        return
+
+    except requests.exceptions.ConnectionError as e:
+        error_logger.error(f"Erro de conexão. Esperando 10 minutos. Tipo de exceção: {type(e).__name__}. Descrição: {e}") 
+        time.sleep(600)
+        main()
+
+    except Exception as e:
+        error_logger.error(f"Erro inesperado. Tipo de exceção: {type(e).__name__}. Descrição: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
