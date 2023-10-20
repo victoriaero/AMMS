@@ -5,25 +5,24 @@ import sys
 import time
 
 # Constants and Configuration
-AUTHORIZATION_TOKEN = 'MTE2NDM5NDU1OTI1MDM2NjU4NQ.GODq5W.0SoUQch0CvOlzR7KxOJWvIpI9mX48t0kxoR8Cc'
+AUTHORIZATION_TOKEN = 'MTE2NDM5NDU1OTI1MDM2NjU4NQ.Geb1_0.vKaDKow8CcToqIOmfbh2Av0Uc94uhVjy23dSrM'
+FILES_FOLDER = 'files'
+LOGS_FOLDER = 'logs'
 OUTPUT_BASE_FOLDER = 'data'
 RATE_LIMIT_WAIT_TIME = 0
 
 #create a mined_servers.txt file if it doesn't exist
-if not os.path.exists('files/mined_servers.txt'):
-    if not os.path.exists('files'):
-        os.makedirs('files')
-    else: 
-        open('files/mined_servers.txt', 'w', encoding='utf-8').close()
+if not os.path.exists(FILES_FOLDER + '/mined_servers.txt'):
+    os.makedirs(FILES_FOLDER, exist_ok=True)
+    open(FILES_FOLDER + '/mined_servers.txt', 'w', encoding='utf-8').close()
 
 # Create a logs directory if it doesn't exist
-if not os.path.exists('logs'):
-    os.makedirs('logs')
+os.makedirs(LOGS_FOLDER, exist_ok=True)
 
 # Create a logger for error messages
 error_logger = logging.getLogger('error_logger')
 error_logger.setLevel(logging.ERROR)
-error_handler = logging.FileHandler('logs/errors.log', mode='w', encoding='utf-8')
+error_handler = logging.FileHandler(LOGS_FOLDER + '/errors.log', mode='a', encoding='utf-8')
 error_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 error_handler.setFormatter(error_formatter)
 error_logger.addHandler(error_handler)
@@ -31,7 +30,7 @@ error_logger.addHandler(error_handler)
 # Create a logger for info messages
 info_logger = logging.getLogger('info_logger')
 info_logger.setLevel(logging.INFO)
-info_handler = logging.FileHandler('logs/info.log', mode='w', encoding='utf-8')
+info_handler = logging.FileHandler(LOGS_FOLDER + '/info.log', mode='a', encoding='utf-8')
 info_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 info_handler.setFormatter(info_formatter)
 info_logger.addHandler(info_handler)
@@ -46,7 +45,7 @@ def make_request(url, headers, params):
 def write_mined_server(server_info):
     server_line = f"{server_info[0]},{server_info[1]}\n"
 
-    with open('files/mined_servers.txt', 'a', encoding='utf-8') as mined_servers_file:
+    with open(FILES_FOLDER + '/mined_servers.txt', 'a', encoding='utf-8') as mined_servers_file:
         mined_servers_file.write(server_line)
 
 # Function to retrieve text channels for a server
@@ -82,7 +81,6 @@ def fetch_channel_messages(channel_id, channel_name, server_name, headers):
         try:
             messages_json = make_request(f'https://discord.com/api/v9/channels/{channel_id}/messages', headers=headers, params=params)
             if not messages_json:
-                error_logger.error(f"Erro ao recuperar mensagens do canal. Response: {e.response}. Status: {e.response.status_code}. Servidor: {server_name}. Canal: {channel_name}.")
                 break
 
             with open(output_file, 'a', encoding='utf-8') as file:
@@ -149,9 +147,11 @@ def main():
         'authorization': AUTHORIZATION_TOKEN
     }
 
+    info_logger.info("Iniciando programa.")
     try:
+        
         for i in range(25, 32):
-            filename = f'files/servidorespagina{i}.txt'
+            filename = FILES_FOLDER + f'/servidorespagina{i}.txt'
 
             if not os.path.exists(filename):
                 error_logger.error(f"Arquivo não encontrado: {filename}.")
@@ -161,7 +161,7 @@ def main():
                 servers = [line.strip().split(",") for line in servers_file]
 
             for server_info in servers:
-                if server_info not in [line.strip().split(",") for line in open('files/mined_servers.txt', 'r', encoding='utf-8')]:
+                if server_info not in [line.strip().split(",") for line in open(FILES_FOLDER + '/mined_servers.txt', 'r', encoding='utf-8')]:
                     process_server_info(server_info, headers)
                 else:
                     server_name, server_id = server_info
