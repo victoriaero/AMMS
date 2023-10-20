@@ -1,41 +1,47 @@
 import zipfile as zf
 from collections import defaultdict
+import os
+
 
 SERVERS_PATH = "C:\\Users\\victo\\OneDrive - Universidade Federal de Minas Gerais\\AMMS\\40.zip"
+OUTPUT_FOLDER = ".\\users_servers"
 
-servers = defaultdict(list)
-server_channels = defaultdict(list)
+server_texts = defaultdict(list) # as chaves sao os servidores e os itens sao os canais
+channels_texts = defaultdict(list) # as chaves sao os canais e os itens sao as mensagens
 
+with zf.ZipFile(SERVERS_PATH, 'r') as servers_zf:
+    files_list = servers_zf.namelist()
+    # servers_zf.printdir()
 
-with zf.ZipFile(SERVERS_PATH, 'r') as servers_zp:
-    file_list = servers_zp.namelist()
-    # servers.printdir()
+    for server_files in files_list:
+        if server_files.endswith('/') and server_files != 'Servidores/':
+            server_name = server_files.split('/')[1]
+            for channels_files in files_list:
+                if channels_files.endswith('.txt') and channels_files.split('/')[1] == server_name: # se o nome do arquivo dos canais tiver o mesmo nome 
+                    channel_name = channels_files.split('/')[2]
+                    server_texts[server_name].append(channels_files)
 
-    for file_name in file_list:
-        # Check if the file is a text file (you can use any desired condition)
-        if file_name.endswith('.txt'):
-            # Extract the server name from the file path
-            server_name = file_name.split('/')[1]
-            channel_name = file_name.split('/')[2]
+                    with servers_zf.open(channels_files) as file:
+                        text = file.read().decode('utf-8')
 
-            # Read the content of the text file within the archive
-            with servers_zp.open(file_name) as file:
-                text = file.read().decode('utf-8')  # Decode the bytes to a string
+                    channels_texts[channel_name].append(text)
 
-            # Append the text to the corresponding server's list
-            servers[server_name].append(channel_name)
-            server_channels[channel_name].append(text)
+# print(server_texts)
 
-for server_name in servers.items():
-    print("Server: ", server_name[0])
-    for channel in server_channels.items():
-        # Process the texts for this server
-        print(f"Channel: ", channel[0])
-        for text in channel[1]:
-                parts = text.strip().split(',')
-                
-                # Verifique se a linha tem pelo menos duas partes (timestamp e nome)
+for server_name in server_texts.keys():
+    print(f"Server: {server_name}")
+    registered_names = set()
+    for channel in server_texts.get(server_name):
+        print(f"Canal: {channel.split('/')[2]}")
+        # if channels_texts.get(channel.split('/')[2]):
+        for channel_text in channels_texts.get(channel.split('/')[2]):
+            for messagem in channel_text:
+                parts = channel_text.strip().split(',')
                 if len(parts) >= 2:
-                    # O nome geralmente está na segunda posição (índice 1)
                     name = parts[1].strip()
-                    print(name)
+                    if name not in registered_names:
+                        registered_names.add(name)
+                        output_file = os.path.join(OUTPUT_FOLDER, f'{server_name}.txt')
+                        with open(output_file, 'a', encoding='utf-8') as names_file:
+                            names_file.write(name + '\n')
+                    # print(name)
