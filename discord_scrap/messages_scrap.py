@@ -91,7 +91,7 @@ def fetch_channel_messages(channel_id, channel_name, server_name, headers):
                         content = message['content']
                         timestamp = message['timestamp']
 
-                        message_str = f'{timestamp},{user_id},{username},{content}\n'
+                        message_str = f'{timestamp},{user_id},{username},{content} $#fim#$\n'
 
                         # print(message_str)
                         file.write(message_str)
