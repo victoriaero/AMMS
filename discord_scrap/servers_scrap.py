@@ -43,4 +43,4 @@ with open(f'servidorespagina{pagina}.txt', 'w', newline='', encoding='utf-8') as
         nome_com_numero, server_id = servidor[0].split(',', 1)
         csvwriter.writerow([nome_com_numero.strip(), server_id.strip()])
 
-print(f"Os servidores foram armazenados em servidorespagina{pagina}.csv")
+print(f"Os servidores foram armazenados em servidorespagina{pagina}.txt")
