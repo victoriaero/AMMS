@@ -5,7 +5,7 @@ import sys
 import time
 
 # Constants and Configuration
-AUTHORIZATION_TOKEN = 'MTE2NDM5NDU1OTI1MDM2NjU4NQ.Geb1_0.vKaDKow8CcToqIOmfbh2Av0Uc94uhVjy23dSrM'
+AUTHORIZATION_TOKEN = ''
 FILES_FOLDER = 'files'
 LOGS_FOLDER = 'logs'
 OUTPUT_BASE_FOLDER = 'data'
@@ -88,7 +88,7 @@ def fetch_channel_messages(channel_id, channel_name, server_name, headers):
                     if 'content' in message and message['content'].strip() != '':
                         username = message['author']['username']
                         user_id = message['author']['id']
-                        content = message['content']
+                        content = message['content'].replace('\n', ' ')
                         timestamp = message['timestamp']
 
                         message_str = f'{timestamp},{user_id},{username},{content} $#fim#$\n'
@@ -150,7 +150,7 @@ def main():
     info_logger.info("Iniciando programa.")
     try:
         
-        for i in range(25, 32):
+        for i in range(1, 32):
             filename = FILES_FOLDER + f'/servidorespagina{i}.txt'
 
             if not os.path.exists(filename):
