@@ -179,7 +179,7 @@ def main():
         time.sleep(600)
         main()
 
-     except requests.exceptions.ChunkedEncodingError as e:
+    except requests.exceptions.ChunkedEncodingError as e:
         error_logger.error(f"ChunkedEncodingError. Esperando 10 minutos. Tipo de exceção: {type(e).__name__}. Descrição: {e}")
         time.sleep(600)
         main()
