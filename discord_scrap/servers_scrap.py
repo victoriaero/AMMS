@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import csv
 
-pagina = 51
+pagina = 14
 
 # Ler o conteúdo do arquivo HTML
 with open('input.html', 'r', encoding='utf-8') as html_file:
